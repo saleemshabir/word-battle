@@ -4,7 +4,22 @@
 
 **Word Battle** is a real-time multiplayer vocabulary game where players compete against each other through exciting word challenges. Create a private room, invite your friends, test your vocabulary, and see who can earn the highest score!
 
+<<<<<<< HEAD
 Built with **React, Node.js, Express, and Socket.IO**, Word Battle brings fast-paced word competitions right to your browser.
+=======
+- Create a private room and share its six-character code.
+- Join without registration. Players receive random display nicknames.
+- Ten rounds per match using Word Scramble, Guess the Word, Missing Letters, Speed Spelling, and Odd Word Out.
+- Questions are selected randomly, with a 20-match no-repeat history for each difficulty while the server is running.
+- Each difficulty has at least 1,000 generated questions across the four word-based challenge types, plus Odd Word Out questions.
+- Easy, Medium and Hard vocabulary sets.
+- Server-authoritative 30-second round timer.
+- Correct answer: 100 base points plus up to 50 speed bonus points.
+- Live scores and leaderboard, answer reveal, winner screen and replay.
+- Host can start, kick players, choose difficulty and end a game.
+- Reconnect with the same browser/device using a saved player token.
+- Responsive dark neon interface with optional sound effects.
+>>>>>>> 59a3f0b (Update Word Battle features)
 
 ---
 

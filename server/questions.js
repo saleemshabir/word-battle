@@ -164,6 +164,7 @@ const vocabulary = {
 };
 
 const roundTypes = ["Word Scramble", "Guess the Word", "Missing Letters", "Speed Spelling", "Odd Word Out"];
+const questionVariantsPerWord = 5;
 const questionHistory = new Map();
 const questionPools = new Map();
 const roundsPerMatch = 10;
@@ -187,25 +188,51 @@ function scramble(word) {
   return `${word.slice(1)}${word[0]}`;
 }
 
-function makeWordQuestion(type, word, clue) {
-  const id = `${type}:${word}`;
-  const question = { id, type, prompt: "", clue, answer: word, display: "" };
+function makeWordQuestion(type, word, clue, variant) {
+  const prompts = {
+    "Word Scramble": [
+      "Rearrange these letters to make a word.",
+      "Unscramble the letters below.",
+      "Put these letters in the correct order.",
+      "Decode the mixed-up letters.",
+      "What word do these letters spell?"
+    ],
+    "Guess the Word": [
+      "Read the clue and guess the word.",
+      "Which word matches this clue?",
+      "Name the word described below.",
+      "Use the definition to identify the word.",
+      "Can you identify the word from its clue?"
+    ],
+    "Missing Letters": [
+      "Fill in the missing letters.",
+      "Complete the word by replacing the blanks.",
+      "Restore the hidden letters.",
+      "Which word fits this pattern?",
+      "Fill every blank to reveal the word."
+    ],
+    "Speed Spelling": [
+      "Spell the word described by the clue.",
+      "Type the word that matches this definition.",
+      "Enter the correctly spelled word.",
+      "Write the word that fits the clue.",
+      "Identify and spell the described word."
+    ]
+  };
+  const id = `${type}:${word}:${variant + 1}`;
+  const question = { id, type, prompt: prompts[type][variant], clue, answer: word, display: "" };
 
   if (type === "Word Scramble") {
-    question.prompt = "Rearrange these letters to make a word.";
     question.display = scramble(word);
   } else if (type === "Guess the Word") {
-    question.prompt = "Read the clue and guess the word.";
     question.display = `Word length: ${word.length} letters`;
   } else if (type === "Missing Letters") {
-    question.prompt = "Fill in the missing letters.";
     const letters = word.split("");
     const hiddenCount = Math.max(1, Math.floor(letters.length / 3));
     const positions = shuffle(Array.from({ length: Math.max(0, letters.length - 2) }, (_, index) => index + 1));
     for (const position of positions.slice(0, hiddenCount)) letters[position] = "_";
     question.display = letters.join(" ");
   } else {
-    question.prompt = "Spell the word described by the clue.";
     question.display = `Word length: ${word.length} letters`;
   }
 
@@ -251,7 +278,10 @@ function buildQuestionPools(level) {
   const entries = vocabulary[level].map(([word, category, clue]) => ({ word, category, clue }));
   const pools = new Map(roundTypes.slice(0, 4).map(type => [
     type,
-    entries.map(({ word, clue }) => makeWordQuestion(type, word, clue))
+    entries.flatMap(({ word, clue }) => Array.from(
+      { length: questionVariantsPerWord },
+      (_, variant) => makeWordQuestion(type, word, clue, variant)
+    ))
   ]));
   pools.set("Odd Word Out", makeOddWordQuestions(entries));
   return pools;
