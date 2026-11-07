@@ -167,7 +167,9 @@ const roundTypes = ["Word Scramble", "Guess the Word", "Missing Letters", "Speed
 const questionVariantsPerWord = 5;
 const questionHistory = new Map();
 const questionPools = new Map();
-const roundsPerMatch = 10;
+export const defaultQuestionCount = 10;
+export const minQuestionCount = 5;
+export const maxQuestionCount = 10;
 const matchesToRemember = 20;
 
 function shuffle(items) {
@@ -246,32 +248,43 @@ function makeOddWordQuestions(entries) {
     groups.get(entry.category).push(entry.word);
   }
 
-  const questions = [];
-  for (const [category, members] of groups) {
-    if (members.length < 3) continue;
-    for (let a = 0; a < members.length - 2; a++) {
-      for (let b = a + 1; b < members.length - 1; b++) {
-        for (let c = b + 1; c < members.length; c++) {
-          for (const outsider of entries) {
-            if (outsider.category === category) continue;
-            const choices = shuffle([members[a], members[b], members[c], outsider.word]);
-            const id = `Odd Word Out:${category}:${[...choices].sort().join(":")}`;
-            questions.push({
-              id,
-              type: "Odd Word Out",
-              prompt: "Choose the word that does not belong.",
-              clue: `Which word is not a ${category}?`,
-              answer: outsider.word,
-              display: choices.join(" · "),
-              choices
-            });
-          }
-        }
-      }
-    }
+  const categories = [...groups].filter(([, members]) => members.length >= 3);
+  if (!categories.length) {
+    throw new Error("Cannot generate Odd Word Out questions without a category containing at least three words.");
+  }
+  const targetCount = 2 * (matchesToRemember + 1);
+  const questions = new Map();
+  const maxAttempts = targetCount * 20;
+
+  for (let attempt = 0; questions.size < targetCount && attempt < maxAttempts; attempt++) {
+    const [category, members] = categories[randomInt(categories.length)];
+    const outsiderEntries = entries.filter(entry => entry.category !== category);
+    if (!outsiderEntries.length) continue;
+
+    const choices = [
+      ...shuffle(members).slice(0, 3),
+      outsiderEntries[randomInt(outsiderEntries.length)].word
+    ];
+    const id = `Odd Word Out:${category}:${[...choices].sort().join(":")}`;
+    if (questions.has(id)) continue;
+
+    const shuffledChoices = shuffle(choices);
+    questions.set(id, {
+      id,
+      type: "Odd Word Out",
+      prompt: "Choose the word that does not belong.",
+      clue: `Which word is not a ${category}?`,
+      answer: choices[3],
+      display: shuffledChoices.join(" · "),
+      choices: shuffledChoices
+    });
   }
 
-  return questions;
+  if (questions.size < targetCount) {
+    throw new Error(`Could not generate enough unique Odd Word Out questions for the ${matchesToRemember}-match repeat limit.`);
+  }
+
+  return [...questions.values()];
 }
 
 function buildQuestionPools(level) {
@@ -287,17 +300,20 @@ function buildQuestionPools(level) {
   return pools;
 }
 
-function getTwoUnusedQuestions(pool, recentIds, type) {
+function getUnusedQuestions(pool, recentIds, type, count) {
   const available = [...new Map(
     pool.filter(question => !recentIds.has(question.id)).map(question => [question.id, question])
   ).values()];
-  if (available.length < 2) {
+  if (available.length < count) {
     throw new Error(`Not enough unused ${type} questions to maintain the ${matchesToRemember}-match repeat limit.`);
   }
-  return shuffle(available).slice(0, 2);
+  return shuffle(available).slice(0, count);
 }
 
-export function getQuestionSet(level) {
+export function getQuestionSet(level, questionCount = defaultQuestionCount) {
+  if (!Number.isInteger(questionCount) || questionCount < minQuestionCount || questionCount > maxQuestionCount) {
+    throw new RangeError(`Question count must be between ${minQuestionCount} and ${maxQuestionCount}.`);
+  }
   const selectedLevel = vocabulary[level] ? level : "Easy";
   let pools = questionPools.get(selectedLevel);
   if (!pools) {
@@ -307,11 +323,15 @@ export function getQuestionSet(level) {
 
   const recentMatches = questionHistory.get(selectedLevel) || [];
   const recentIds = new Set(recentMatches.flat());
-  const set = roundTypes.flatMap(type => getTwoUnusedQuestions(pools.get(type), recentIds, type));
+  const shuffledTypes = shuffle(roundTypes);
+  const selectedTypes = [...shuffledTypes, ...shuffledTypes].slice(0, questionCount);
+  const countsByType = new Map();
+  for (const type of selectedTypes) countsByType.set(type, (countsByType.get(type) || 0) + 1);
+  const set = [...countsByType].flatMap(([type, count]) =>
+    getUnusedQuestions(pools.get(type), recentIds, type, count)
+  );
   const questionSet = shuffle(set);
 
   questionHistory.set(selectedLevel, [...recentMatches, questionSet.map(question => question.id)].slice(-matchesToRemember));
   return questionSet;
 }
-
-export { roundsPerMatch };

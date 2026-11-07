@@ -4,7 +4,12 @@ import path from "path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
-import { getQuestionSet, roundsPerMatch } from "./questions.js";
+import {
+  defaultQuestionCount,
+  getQuestionSet,
+  maxQuestionCount,
+  minQuestionCount
+} from "./questions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -36,7 +41,7 @@ function makeNickname() {
 function publicRoom(room) {
   return {
     code: room.code, status: room.status, hostId: room.hostId, difficulty: room.difficulty,
-    round: room.round, totalRounds: roundsPerMatch, deadline: room.deadline,
+    round: room.round, totalQuestions: room.questionCount, deadline: room.deadline,
     question: room.question ? { type: room.question.type, prompt: room.question.prompt, clue: room.question.clue, display: room.question.display, choices: room.question.choices || null } : null,
     answer: room.revealed ? room.question?.answer : null,
     players: [...room.players.values()].map(p => ({ id: p.id, nickname: p.nickname, score: p.score, connected: p.connected, answered: p.answered, correctAnswers: p.correctAnswers })),
@@ -66,7 +71,7 @@ function finishRound(room) {
   room.revealed = true;
   room.deadline = null;
   emitRoom(room);
-  if (room.round >= roundsPerMatch) {
+  if (room.round >= room.questionCount) {
     room.status = "finished";
     emitRoom(room);
     return;
@@ -82,7 +87,7 @@ io.on("connection", socket => {
     const code = makeCode();
     const nickname = makeNickname();
     const room = {
-      code, status: "lobby", hostId: socket.id, difficulty: "Easy", round: 0,
+      code, status: "lobby", hostId: socket.id, difficulty: "Easy", questionCount: defaultQuestionCount, round: 0,
       question: null, questionSet: null, deadline: null, revealed: false, timer: null, nextTimer: null,
       players: new Map()
     };
@@ -128,14 +133,24 @@ io.on("connection", socket => {
     room.difficulty = difficulty; emitRoom(room); safeAck(ack, { ok: true });
   });
 
+  socket.on("host:question-count", ({ questionCount } = {}, ack) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.hostId !== socket.id || room.status !== "lobby") return safeAck(ack, { ok: false, error: "Only the host can change the question count before the game starts." });
+    if (!Number.isInteger(questionCount) || questionCount < minQuestionCount || questionCount > maxQuestionCount) {
+      return safeAck(ack, { ok: false, error: `Question count must be between ${minQuestionCount} and ${maxQuestionCount}.` });
+    }
+    room.questionCount = questionCount;
+    emitRoom(room);
+    safeAck(ack, { ok: true });
+  });
+
   socket.on("host:start", (_data, ack) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.hostId !== socket.id || room.status !== "lobby") return safeAck(ack, { ok: false, error: "Only the host can start this game." });
     if (room.players.size < 2) return safeAck(ack, { ok: false, error: "At least two players are required to start." });
     room.status = "playing";
     room.round = 0;
-    room.questionSet = getQuestionSet(room.difficulty);
-    for (const p of room.players.values()) { p.score = 0; p.correctAnswers = 0; }
+    room.questionSet = getQuestionSet(room.difficulty, room.questionCount);
     safeAck(ack, { ok: true });
     startRound(room);
   });
@@ -193,7 +208,7 @@ io.on("connection", socket => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.hostId !== socket.id || room.status !== "finished") return safeAck(ack, { ok: false, error: "Only the host can restart a finished game." });
     room.status = "lobby"; room.round = 0; room.question = null; room.deadline = null; room.revealed = false;
-    for (const p of room.players.values()) { p.score = 0; p.correctAnswers = 0; p.answered = false; p.lastAnswer = null; }
+    for (const p of room.players.values()) { p.answered = false; p.lastAnswer = null; }
     emitRoom(room); safeAck(ack, { ok: true });
   });
 

@@ -9,14 +9,15 @@ Built with **React, Node.js, Express, and Socket.IO**, Word Battle brings fast-p
 =======
 - Create a private room and share its six-character code.
 - Join without registration. Players receive random display nicknames.
-- Ten rounds per match using Word Scramble, Guess the Word, Missing Letters, Speed Spelling, and Odd Word Out.
+- The host chooses 5 to 10 questions per match, using Word Scramble, Guess the Word, Missing Letters, Speed Spelling, and Odd Word Out.
 - Questions are selected randomly, with a 20-match no-repeat history for each difficulty while the server is running.
 - Each difficulty has at least 1,000 generated questions across the four word-based challenge types, plus Odd Word Out questions.
 - Easy, Medium and Hard vocabulary sets.
 - Server-authoritative 30-second round timer.
 - Correct answer: 100 base points plus up to 50 speed bonus points.
 - Live scores and leaderboard, answer reveal, winner screen and replay.
-- Host can start, kick players, choose difficulty and end a game.
+- Scores and correct-answer totals accumulate across replays in the same room; the final leaderboard ranks players by their combined room score.
+- Host can choose difficulty and question count, start a game, kick players and end a game.
 - Reconnect with the same browser/device using a saved player token.
 - Responsive dark neon interface with optional sound effects.
 >>>>>>> 59a3f0b (Update Word Battle features)
@@ -51,8 +52,8 @@ Built with **React, Node.js, Express, and Socket.IO**, Word Battle brings fast-p
 1. Open Word Battle.
 2. Create a private room or join an existing room using its code.
 3. Invite 1–7 friends.
-4. The host selects a difficulty level.
-5. Start the game and compete across 10 rounds.
+4. The host selects a difficulty level and chooses 5 to 10 questions for the match.
+5. Start the game and compete across the selected number of questions.
 6. Answer the word challenges before the timer runs out.
 7. Earn points, climb the leaderboard, and become the Word Battle champion!
 
@@ -67,9 +68,9 @@ Built with **React, Node.js, Express, and Socket.IO**, Word Battle brings fast-p
 | Incorrect Answer | 0 |
 | No Answer | 0 |
 
-**Maximum possible score:** 1,500 points per player.
+**Maximum possible score:** 750 to 1,500 points per player, depending on the selected question count.
 
-The player with the highest total score after 10 rounds wins the match.
+The player with the highest total score after all selected questions wins the match.
 
 ---
 
@@ -83,7 +84,7 @@ The player with the highest total score after 10 rounds wins the match.
 | Speed Spelling | Spell the given word correctly. |
 | Odd Word Out | Find the word that does not belong in the group. |
 
-Each match contains 10 rounds, with every game mode appearing twice.
+Each match contains 5 to 10 questions. All five game modes appear, with additional modes selected for matches longer than five questions.
 
 ---
 
