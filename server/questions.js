@@ -170,7 +170,9 @@ const questionPools = new Map();
 export const defaultQuestionCount = 10;
 export const minQuestionCount = 5;
 export const maxQuestionCount = 10;
-const matchesToRemember = 20;
+// Keep the last two matches' answer words out of rotation. Each difficulty has
+// 50 vocabulary words, so answer-based history must stay shorter than that pool.
+const matchesToRemember = 2;
 
 function shuffle(items) {
   const shuffled = [...items];
@@ -222,7 +224,7 @@ function makeWordQuestion(type, word, clue, variant) {
     ]
   };
   const id = `${type}:${word}:${variant + 1}`;
-  const question = { id, type, prompt: prompts[type][variant], clue, answer: word, display: "" };
+  const question = { id, repeatKey: `word:${word}`, type, prompt: prompts[type][variant], clue, answer: word, display: "" };
 
   if (type === "Word Scramble") {
     question.display = scramble(word);
@@ -271,6 +273,9 @@ function makeOddWordQuestions(entries) {
     const shuffledChoices = shuffle(choices);
     questions.set(id, {
       id,
+      // Odd Word Out has a different identity: its category and full choice set
+      // define the puzzle, and there are fewer possible outsider answers.
+      repeatKey: `odd:${id}`,
       type: "Odd Word Out",
       prompt: "Choose the word that does not belong.",
       clue: `Which word is not a ${category}?`,
@@ -300,9 +305,9 @@ function buildQuestionPools(level) {
   return pools;
 }
 
-function getUnusedQuestions(pool, recentIds, type, count) {
+function getUnusedQuestions(pool, recentKeys, type, count) {
   const available = [...new Map(
-    pool.filter(question => !recentIds.has(question.id)).map(question => [question.id, question])
+    pool.filter(question => !recentKeys.has(question.repeatKey)).map(question => [question.repeatKey, question])
   ).values()];
   if (available.length < count) {
     throw new Error(`Not enough unused ${type} questions to maintain the ${matchesToRemember}-match repeat limit.`);
@@ -322,16 +327,19 @@ export function getQuestionSet(level, questionCount = defaultQuestionCount) {
   }
 
   const recentMatches = questionHistory.get(selectedLevel) || [];
-  const recentIds = new Set(recentMatches.flat());
+  const recentKeys = new Set(recentMatches.flat());
   const shuffledTypes = shuffle(roundTypes);
   const selectedTypes = [...shuffledTypes, ...shuffledTypes].slice(0, questionCount);
   const countsByType = new Map();
   for (const type of selectedTypes) countsByType.set(type, (countsByType.get(type) || 0) + 1);
-  const set = [...countsByType].flatMap(([type, count]) =>
-    getUnusedQuestions(pools.get(type), recentIds, type, count)
-  );
+  const set = [];
+  for (const [type, count] of countsByType) {
+    const questions = getUnusedQuestions(pools.get(type), recentKeys, type, count);
+    set.push(...questions);
+    for (const question of questions) recentKeys.add(question.repeatKey);
+  }
   const questionSet = shuffle(set);
 
-  questionHistory.set(selectedLevel, [...recentMatches, questionSet.map(question => question.id)].slice(-matchesToRemember));
+  questionHistory.set(selectedLevel, [...recentMatches, questionSet.map(question => question.repeatKey)].slice(-matchesToRemember));
   return questionSet;
 }
